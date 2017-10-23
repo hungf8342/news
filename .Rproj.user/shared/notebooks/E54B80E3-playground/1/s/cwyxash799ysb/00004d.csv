@@ -1,0 +1,5 @@
+"0","tops_news %>% gather(topic,coverage,-names) %>%"
+"0","  ggplot(aes(x=topic,y=names))+geom_point(aes(size=coverage,fill=coverage),shape=21)+"
+"0","  guides(size=FALSE)+"
+"0","  ylab(""sources"") +"
+"0","  ggtitle(""Coverage of Topics by Source (10/22/2017)"")"

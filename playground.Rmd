@@ -6,7 +6,7 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE,warning=FALSE)
+knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE,tidy=TRUE)
 ```
 
 ## Playground
@@ -31,7 +31,7 @@ make_dataframe<-function(url) {
 }
 ```
 
-
+##Reading in Headlines
 ```{r}
 al_jazeera<-make_dataframe("https://newsapi.org/v1/articles?source=al-jazeera-english&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
 colnames(al_jazeera)[2]<-"al_jazeera"
@@ -46,7 +46,7 @@ colnames(nyt)[2]<-"nyt"
 
 ```
 
-
+##What proportion of headlines in one source contain a certain key word(s)?
 ```{r}
 topic_contain<-function(list,dataset) {
   p<-TRUE
@@ -58,6 +58,8 @@ topic_contain<-function(list,dataset) {
 }
 ```
 
+
+##Applying the above function to multiple sources
 ```{r}
 topics<-function(dataset,terms) {
   t(as.data.frame(unlist(lapply(terms,topic_contain,dataset))))
@@ -68,7 +70,7 @@ topics<-function(dataset,terms) {
 topics(reuters$title,list(c("Trump","JFK"),c("Japan")))
 ```
 
-
+##Making our DataFrame
 ```{r}
 key_words<-list(c("Trump"),c("Japan"),"Catalonia","WHO","Fox")
 news<-c(reuters,bbc,al_jazeera,breitbart,nyt)
@@ -80,8 +82,14 @@ tops_news$names<-rownames(tops_news)
 tops_news
 ```
 
+##Plotting a Bubble Graph
 ```{r}
 tops_news %>% gather(topic,coverage,-names) %>%
-  ggplot(aes(x=topic,y=coverage,color=names,size=coverage))+geom_point()
+  ggplot(aes(x=topic,y=names))+geom_point(aes(size=coverage,fill=coverage),shape=21)+
+  guides(size=FALSE)+
+  ylab("sources") +
+  ggtitle("Coverage of Topics by Source (10/22/2017)")
 ```
+
+
 
