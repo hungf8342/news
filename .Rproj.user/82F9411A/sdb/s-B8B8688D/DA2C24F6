@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "---\ntitle: \"Playground\"\nauthor: \"Frances Hung\"\ndate: \"10/21/2017\"\noutput: pdf_document\n---\n\n```{r setup, include=FALSE}\nknitr::opts_chunk$set(echo = TRUE,warning=FALSE)\n```\n\n## Playground\n\n\n```{r}\nrequire(httr)\nrequire(jsonlite)\nrequire(lubridate)\nrequire(dplyr)\nrequire(data.table)\nrequire(tidyr)\nrequire(ggplot2)\n```\n\n\n```{r}\nmake_dataframe<-function(url) {\n  filler<-GET(url)\n  filler2<-rawToChar(filler$content) %>% fromJSON() %>% .[4]   \n  return(do.call(what=\"rbind\",args=lapply(filler2,as.data.frame)))\n}\n```\n\n\n```{r}\nal_jazeera<-make_dataframe(\"https://newsapi.org/v1/articles?source=al-jazeera-english&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff\")\ncolnames(al_jazeera)[2]<-\"al_jazeera\"\nbbc<-make_dataframe(\"https://newsapi.org/v1/articles?source=bbc-news&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff\")\ncolnames(bbc)[2]<-\"bbc\"\nbreitbart<-make_dataframe(\"https://newsapi.org/v1/articles?source=breitbart-news&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff\")\ncolnames(breitbart)[2]<-\"breitbart\"\nreuters<-make_dataframe(\"https://newsapi.org/v1/articles?source=reuters&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff\")\ncolnames(reuters)[2]<-\"reuters\"\nnyt<- make_dataframe(\"https://newsapi.org/v1/articles?source=the-new-york-times&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff\")\ncolnames(nyt)[2]<-\"nyt\"\n\n```\n\n\n```{r}\ntopic_contain<-function(list,dataset) {\n  p<-TRUE\n  for (i in length(list)) {\n    new<-grepl(list[i],dataset)\n    p<-(p & new)\n  }\n  sum(p)/10\n}\n```\n\n```{r}\ntopics<-function(dataset,terms) {\n  t(as.data.frame(unlist(lapply(terms,topic_contain,dataset))))\n}\n```\n\n```{r}\ntopics(reuters$title,list(c(\"Trump\",\"JFK\"),c(\"Japan\")))\n```\n\n\n```{r}\nkey_words<-list(c(\"Trump\"),c(\"Japan\"),\"Catalonia\",\"WHO\",\"Fox\")\nnews<-c(reuters,bbc,al_jazeera,breitbart,nyt)\ntest<-as.data.frame(sapply(news,topics,key_words))\ntest<-test[,!duplicated(colnames(test))]\nrow.names(test)<-key_words\ntops_news<-as.data.frame(t(subset(test, , -c(author, url, urlToImage,description,publishedAt))))\ntops_news$names<-rownames(tops_news)\ntops_news\n```\n\n```{r}\ntops_news %>% gather(topic,coverage,-names) %>%\n  ggplot(aes(x=topic,y=coverage,color=names,size=coverage))+geom_point()\n```\n\n",
+    "created" : 1508613946558.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "4286354029",
+    "id" : "DA2C24F6",
+    "lastKnownWriteTime" : 1508725788,
+    "last_content_update" : 1508725788230,
+    "path" : "~/Desktop/Junior/CompStats/project/project/playground.Rmd",
+    "project_path" : "playground.Rmd",
+    "properties" : {
+        "last_setup_crc32" : "EEBCA407dccd0c6e",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

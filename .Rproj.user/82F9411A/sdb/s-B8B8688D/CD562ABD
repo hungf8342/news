@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1508631410551.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "CD562ABD",
+    "lastKnownWriteTime" : 4294967296,
+    "last_content_update" : 1508631410551,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "3CDBB096",
+        "caption" : "al_jazeera",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=al_jazeera&cache_key=3CDBB096",
+        "displayedObservations" : "10",
+        "environment" : "",
+        "object" : "al_jazeera",
+        "preview" : "0",
+        "totalObservations" : "10",
+        "variables" : "6"
+    },
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1508612518320.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "10280069",
+    "lastKnownWriteTime" : -7924365018681573377,
+    "last_content_update" : 1508612518320,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "E0194905",
+        "caption" : "CA_depression_1year",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=CA_depression_1year&cache_key=E0194905",
+        "displayedObservations" : 260,
+        "environment" : "",
+        "object" : "CA_depression_1year",
+        "preview" : 0,
+        "totalObservations" : 260,
+        "variables" : 6
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

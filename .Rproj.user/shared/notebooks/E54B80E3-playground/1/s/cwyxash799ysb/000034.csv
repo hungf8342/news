@@ -1,0 +1,2 @@
+"0","tops_news %>% gather(topic,coverage,-names) %>%"
+"0","  ggplot(aes(x=topic,y=coverage,color=names,size=coverage*10))+geom_point()"

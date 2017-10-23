@@ -1,0 +1,87 @@
+---
+title: "Playground"
+author: "Frances Hung"
+date: "10/21/2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,warning=FALSE)
+```
+
+## Playground
+
+
+```{r}
+require(httr)
+require(jsonlite)
+require(lubridate)
+require(dplyr)
+require(data.table)
+require(tidyr)
+require(ggplot2)
+```
+
+
+```{r}
+make_dataframe<-function(url) {
+  filler<-GET(url)
+  filler2<-rawToChar(filler$content) %>% fromJSON() %>% .[4]   
+  return(do.call(what="rbind",args=lapply(filler2,as.data.frame)))
+}
+```
+
+
+```{r}
+al_jazeera<-make_dataframe("https://newsapi.org/v1/articles?source=al-jazeera-english&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
+colnames(al_jazeera)[2]<-"al_jazeera"
+bbc<-make_dataframe("https://newsapi.org/v1/articles?source=bbc-news&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
+colnames(bbc)[2]<-"bbc"
+breitbart<-make_dataframe("https://newsapi.org/v1/articles?source=breitbart-news&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
+colnames(breitbart)[2]<-"breitbart"
+reuters<-make_dataframe("https://newsapi.org/v1/articles?source=reuters&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
+colnames(reuters)[2]<-"reuters"
+nyt<- make_dataframe("https://newsapi.org/v1/articles?source=the-new-york-times&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
+colnames(nyt)[2]<-"nyt"
+
+```
+
+
+```{r}
+topic_contain<-function(list,dataset) {
+  p<-TRUE
+  for (i in length(list)) {
+    new<-grepl(list[i],dataset)
+    p<-(p & new)
+  }
+  sum(p)/10
+}
+```
+
+```{r}
+topics<-function(dataset,terms) {
+  t(as.data.frame(unlist(lapply(terms,topic_contain,dataset))))
+}
+```
+
+```{r}
+topics(reuters$title,list(c("Trump","JFK"),c("Japan")))
+```
+
+
+```{r}
+key_words<-list(c("Trump"),c("Japan"),"Catalonia","WHO","Fox")
+news<-c(reuters,bbc,al_jazeera,breitbart,nyt)
+test<-as.data.frame(sapply(news,topics,key_words))
+test<-test[,!duplicated(colnames(test))]
+row.names(test)<-key_words
+tops_news<-as.data.frame(t(subset(test, , -c(author, url, urlToImage,description,publishedAt))))
+tops_news$names<-rownames(tops_news)
+tops_news
+```
+
+```{r}
+tops_news %>% gather(topic,coverage,-names) %>%
+  ggplot(aes(x=topic,y=coverage,color=names,size=coverage))+geom_point()
+```
+

@@ -1,0 +1,3 @@
+"0","topics<-function(dataset,terms) {"
+"0","  t(as.data.frame(unlist(lapply(terms,topic_contain,dataset))))"
+"0","}"

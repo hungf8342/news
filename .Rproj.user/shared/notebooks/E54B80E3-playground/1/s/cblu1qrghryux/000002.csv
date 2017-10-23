@@ -1,0 +1,8 @@
+"0","topic_contain<-function(list,dataset) {"
+"0","  p<-TRUE"
+"0","  for (i in length(list)) {"
+"0","    new<-grepl(list[i],dataset)"
+"0","    p<-(p & new)"
+"0","  }"
+"0","  sum(p)/10"
+"0","}"

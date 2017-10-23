@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1508631413584.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "74CD354B",
+    "lastKnownWriteTime" : 4337466624,
+    "last_content_update" : 1508631413584,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "2EF66400",
+        "caption" : "breitbart",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=breitbart&cache_key=2EF66400",
+        "displayedObservations" : 10,
+        "environment" : "",
+        "object" : "breitbart",
+        "preview" : 0,
+        "totalObservations" : 10,
+        "variables" : 6
+    },
+    "relative_order" : 7,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

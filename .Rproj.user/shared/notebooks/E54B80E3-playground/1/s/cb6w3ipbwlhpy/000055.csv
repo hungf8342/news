@@ -1,0 +1,8 @@
+"0","key_words<-list(c(""Trump""),c(""Japan""),""Catalonia"",""WHO"",""Fox"")"
+"0","news<-c(reuters,bbc,al_jazeera,breitbart,nyt)"
+"0","test<-as.data.frame(sapply(news,topics,key_words))"
+"0","test<-test[,!duplicated(colnames(test))]"
+"0","row.names(test)<-key_words"
+"0","tops_news<-as.data.frame(t(subset(test, , -c(author, url, urlToImage,description,publishedAt))))"
+"0","tops_news$names<-rownames(tops_news)"
+"0","tops_news"

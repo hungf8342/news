@@ -1,0 +1,5 @@
+"0","make_dataframe<-function(url) {"
+"0","  filler<-GET(url)"
+"0","  filler2<-rawToChar(filler$content) %>% fromJSON() %>% .[4]   "
+"0","  return(do.call(what=""rbind"",args=lapply(filler2,as.data.frame)))"
+"0","}"
