@@ -1,0 +1,13 @@
+# -*- coding: utf-8 -*-
+"""
+Spyder Editor
+
+This is a temporary script file.
+"""
+
+import requests
+import json
+
+url="https://newsapi.org/v1/articles?source=reuters&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff"
+r=requests.get(url)
+print(json.loads(r.content))

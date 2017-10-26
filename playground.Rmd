@@ -44,6 +44,8 @@ colnames(reuters)[2]<-"reuters"
 nyt<- make_dataframe("https://newsapi.org/v1/articles?source=the-new-york-times&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
 colnames(nyt)[2]<-"nyt"
 
+
+
 ```
 
 ##What proportion of headlines in one source contain a certain key word(s)?
@@ -91,5 +93,62 @@ tops_news %>% gather(topic,coverage,-names) %>%
   ggtitle("Coverage of Topics by Source (10/22/2017)")
 ```
 
+##Using Machine Learning To Scrape Key Words in Headlines
+
+Our training dataset will consist of accumulated Reuters and BBC headlines. Features include whether a given word is capitalized, whether it's more than 4 letters long, and whether it's a commonly used word.
+
+Good training data has equal numbers of data in each group, so we'll remove some unimportant terms from the training data randomly.
+```{r}
+data.frame(one=strsplit(reuters$reuters,split=" ")[1])
+
+charnum<-function(title_col){
+  reg<-data.frame(words=c(),length=c())
+  for (i in 1:length(title_col)) {
+        broke_headlines<-as.list(unlist(strsplit(title_col,split=" ")[i]))
+        broke_headlines<-lapply(broke_headlines,function(x) gsub("\\'s|[^[:alnum:][:space:]]","",x))
+        temp<-data.frame(words=t(as.data.frame((broke_headlines))),
+                         length=t(as.data.frame(lapply(broke_headlines, function(x) as.numeric(nchar(x)>=5)))),
+                         caps=t(as.data.frame(lapply(broke_headlines,function(x) as.numeric(substr(x,1,1)==toupper(substr(x,1,1))))))
+                                )
+        reg<-rbind(reg,temp)
+  }
+  return(reg)
+}
+
+ml<-charnum(reuters$reuters) 
+
+keys<-c("tax","Catalan","Madrid","Kenya","Boycott","China","opioids","Fed","Obamacare","Tesla","Twitter")
+ml$important<-as.numeric(ml$words %in% keys) 
+
+```
+
+```{r}
+popular_words<-as.data.frame(read.table("top.txt"))
+colnames(popular_words)<-"common"
+common_words<-popular_words[1:2500,]
+```
+
+```{r}
+ml$common<-as.numeric(tolower(ml$words) %in% common_words)
+ml
+```
+
+
+##14-fold Cross Validation
+```{r}
+shuffle_ml<-ml[sample(nrow(ml)),]
+cv<-function (k,dataset) {
+  for (i in 0:(k-1)) {
+    testing<-dataset[(i*(nrow(dataset)/k)+1):(i*(nrow(dataset)/k)+(nrow(dataset)/k)),]
+    print(testing)
+  }
+}
+
+cv(14,shuffle_ml)
+```
+
+```{r}
+summary(glm(important~length+caps+common,family=binomial(link="logit"),data=ml))
+```
 
 
