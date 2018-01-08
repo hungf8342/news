@@ -1,5 +1,5 @@
 ---
-title: "Playground"
+title: "Classifying News Sources"
 author: "Frances Hung"
 date: "10/21/2017"
 output: pdf_document
@@ -9,7 +9,11 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE,tidy=TRUE)
 ```
 
-## Playground
+## Intro
+
+"Fake news" has been a concern for both sides of the political spectrum. We can look at topic coverage over different news sources by analyzing the topics, or keywords, which appear frequently across all news headlines during a given day. Are there keyword frequency patterns (perhaps we can call them "fingerprints") which can be used to identify political leanings or biasedness among news sources? 
+
+In the first part of this project, I attempted to visualize these fingerprints. With the help of NewsAPI (https://newsapi.org/) and some regex, I cleaned the headlines of a few news sources and found keywords. I then plotted the frequencies of these keywords in a bubble chart.
 
 
 ```{r}
@@ -20,32 +24,50 @@ require(dplyr)
 require(data.table)
 require(tidyr)
 require(ggplot2)
+require(tm)
+require(stringr)
 ```
 
 
 ```{r}
 make_dataframe<-function(url) {
-  filler<-GET(url)
-  filler2<-rawToChar(filler$content) %>% fromJSON() %>% .[4]   
-  return(do.call(what="rbind",args=lapply(filler2,as.data.frame)))
+  headlines<-GET(url)$content %>% rawToChar() %>% fromJSON() %>% .[3] %>% as.data.frame() %>% .$articles.title %>% as.data.frame()
+  colnames(headlines)<-GET(url)$content %>% rawToChar() %>% fromJSON() %>% .[3] %>% as.data.frame() %>% .$articles.source %>% .$id %>% .[1]
+  return(headlines)
+}
+
+#clean headlines by removing punctuation
+remove_stops<-function(headlines) {
+  heads=as.vector(headlines) %>% tolower() %>% gsub("'s|[[:punct:]]","",.) %>% gsub("[[:space:]]", " ",.)
+  stop_regex=paste(stopwords('en'), collapse='\\b|\\b')
+  stop_regex=paste0('\\b', stop_regex, '\\b')
+  heads = stringr::str_replace_all(heads, stop_regex, '')
+  return(heads)
 }
 ```
 
 ##Reading in Headlines
 ```{r}
-al_jazeera<-make_dataframe("https://newsapi.org/v1/articles?source=al-jazeera-english&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
-colnames(al_jazeera)[2]<-"al_jazeera"
-bbc<-make_dataframe("https://newsapi.org/v1/articles?source=bbc-news&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
-colnames(bbc)[2]<-"bbc"
-breitbart<-make_dataframe("https://newsapi.org/v1/articles?source=breitbart-news&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
-colnames(breitbart)[2]<-"breitbart"
-reuters<-make_dataframe("https://newsapi.org/v1/articles?source=reuters&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
-colnames(reuters)[2]<-"reuters"
-nyt<- make_dataframe("https://newsapi.org/v1/articles?source=the-new-york-times&sortBy=top&apiKey=990d579b0b444038904c73627b57c5ff")
-colnames(nyt)[2]<-"nyt"
+al_jazeera<-make_dataframe("https://newsapi.org/v2/top-headlines?sources=al-jazeera-english&apiKey=9bfcf9f72ada452aa953c9f93f5c549f")
+#colnames(al_jazeera)[2]<-"al_jazeera"
+bbc<-make_dataframe("https://newsapi.org/v2/top-headlines?sources=bbc-news&apiKey=9bfcf9f72ada452aa953c9f93f5c549f")
+breitbart<-make_dataframe("https://newsapi.org/v2/top-headlines?sources=breitbart-news&apiKey=9bfcf9f72ada452aa953c9f93f5c549f")
+reuters<-make_dataframe("https://newsapi.org/v2/top-headlines?sources=reuters&apiKey=9bfcf9f72ada452aa953c9f93f5c549f")
+times<- make_dataframe("https://newsapi.org/v2/top-headlines?sources=time&apiKey=9bfcf9f72ada452aa953c9f93f5c549f")
+google_news<-make_dataframe("https://newsapi.org/v2/top-headlines?sources=google-news&apiKey=9bfcf9f72ada452aa953c9f93f5c549f")
+cbs<-make_dataframe("https://newsapi.org/v2/top-headlines?sources=cbs-news&apiKey=9bfcf9f72ada452aa953c9f93f5c549f")
+ap<-make_dataframe("https://newsapi.org/v2/top-headlines?sources=associated-press&apiKey=9bfcf9f72ada452aa953c9f93f5c549f")
+fox<-make_dataframe("https://newsapi.org/v2/top-headlines?sources=fox-news&apiKey=9bfcf9f72ada452aa953c9f93f5c549f")
+huff_post<-make_dataframe("https://newsapi.org/v2/top-headlines?sources=the-huffington-post&apiKey=9bfcf9f72ada452aa953c9f93f5c549f")
+```
 
 
+```{r}
+headlines.short<-unlist(lapply(c(reuters,bbc,google_news,fox,breitbart,huff_post),remove_stops))
 
+#dataframe of words repeated more than twice across headlines
+headlines.short<-unlist(strsplit(headlines.short," ")) %>% table() %>% .[(.)>2] %>% as.data.frame() %>% .[-1,]
+colnames(headlines.short)<-c("word","freq")
 ```
 
 ##What proportion of headlines in one source contain a certain key word(s)?
@@ -53,7 +75,7 @@ colnames(nyt)[2]<-"nyt"
 topic_contain<-function(list,dataset) {
   p<-TRUE
   for (i in length(list)) {
-    new<-grepl(list[i],dataset)
+    new<-grepl(list[i],dataset[,1])
     p<-(p & new)
   }
   sum(p)/10
@@ -61,94 +83,55 @@ topic_contain<-function(list,dataset) {
 ```
 
 
-##Applying the above function to multiple sources
+##Applying the above function to multiple key words
 ```{r}
 topics<-function(dataset,terms) {
-  t(as.data.frame(unlist(lapply(terms,topic_contain,dataset))))
+  as.data.frame(unlist(lapply(terms,topic_contain,dataset))) %>% unlist()
 }
 ```
 
-```{r}
-topics(reuters$title,list(c("Trump","JFK"),c("Japan")))
-```
 
-##Making our DataFrame
-```{r}
-key_words<-list(c("Trump"),c("Japan"),"Catalonia","WHO","Fox")
-news<-c(reuters,bbc,al_jazeera,breitbart,nyt)
-test<-as.data.frame(sapply(news,topics,key_words))
-test<-test[,!duplicated(colnames(test))]
-row.names(test)<-key_words
-tops_news<-as.data.frame(t(subset(test, , -c(author, url, urlToImage,description,publishedAt))))
-tops_news$names<-rownames(tops_news)
-tops_news
-```
+##Visualizing Keyword Frequencies in New Sources
+I've taken the words which appear more than twice among headlines of six news sources: Reuters, BBC, Google News, Fox, Breitbart, and the Huffington Post. 
 
-##Plotting a Bubble Graph
+I then plotted frequencies of each of these words for each of 7 news sources on a bubble plot. The size and color of each bubble represent the frequency of a word in a given news source.
+
+
 ```{r}
-tops_news %>% gather(topic,coverage,-names) %>%
-  ggplot(aes(x=topic,y=names))+geom_point(aes(size=coverage,fill=coverage),shape=21)+
+
+#function which takes a news source and returns the frequency of keywords appearing in that source's headlines
+#requires final.keywords$words, a column of keywords
+final_col<-function(news_source) {
+  news<-sapply(news_source,tolower)
+  single<-topics(news,headlines.short$word) %>% as.data.frame()
+  rownames(single)<-headlines.short$word %>% as.character()
+  return(single)
+}
+
+#function which applies the above function to many news sources and aggregates them as a dataframe
+freq.keywords<-function(news) {
+  final_table<-as.data.frame(sapply(news, function(x) final_col(x)))
+  rownames(final_table)<-headlines.short$word
+  return(final_table)
+}
+
+final_table<-freq.keywords(list(reuters,bbc,cbs,breitbart,huff_post,fox,times))
+colnames(final_table)<-c("reuters","bbc","cbs","breitbart","huff_post","fox","times")
+final_table<-final_table %>% setDT(keep.rownames=TRUE)
+
+final_table %>% gather(news_src,coverage,-rn) %>%
+  ggplot(aes(x=news_src,y=rn))+geom_point(aes(size=coverage,fill=coverage),shape=21)+
   guides(size=FALSE)+
-  ylab("sources") +
-  ggtitle("Coverage of Topics by Source (10/22/2017)")
+  ylab("keywords") +
+  ggtitle(paste("Coverage of Topics by Source",Sys.Date()))
 ```
 
-##Using Machine Learning To Scrape Key Words in Headlines
+##Preliminary Observations
 
-Our training dataset will consist of accumulated Reuters and BBC headlines. Features include whether a given word is capitalized, whether it's more than 4 letters long, and whether it's a commonly used word.
+Visually, it is difficult to compare fingerprints correctly between news sources, but nevertheless, there are some patterns which seem to occur. Generally, conservative news sources like Fox and Breitbart heavily cover different (usually less global) topics from liberal news sources. This leads to a more scattered fingerprint. However, there are exceptions (on 1/8/2018, for instance, Breitbart's fingerprint was one of the most dense. The major headlines that morning for most sources were on Trump Tower, the Golden Globes/Oprah Winfrey, and Salvadorans, which were all national and not global news). 
 
-Good training data has equal numbers of data in each group, so we'll remove some unimportant terms from the training data randomly.
-```{r}
-data.frame(one=strsplit(reuters$reuters,split=" ")[1])
+The same goes for far-left sources like Al Jazeera. These news sources tended to cover lesser-known events than mainstream media covered.
 
-charnum<-function(title_col){
-  reg<-data.frame(words=c(),length=c())
-  for (i in 1:length(title_col)) {
-        broke_headlines<-as.list(unlist(strsplit(title_col,split=" ")[i]))
-        broke_headlines<-lapply(broke_headlines,function(x) gsub("\\'s|[^[:alnum:][:space:]]","",x))
-        temp<-data.frame(words=t(as.data.frame((broke_headlines))),
-                         length=t(as.data.frame(lapply(broke_headlines, function(x) as.numeric(nchar(x)>=5)))),
-                         caps=t(as.data.frame(lapply(broke_headlines,function(x) as.numeric(substr(x,1,1)==toupper(substr(x,1,1))))))
-                                )
-        reg<-rbind(reg,temp)
-  }
-  return(reg)
-}
+##Future Steps
 
-ml<-charnum(reuters$reuters) 
-
-keys<-c("tax","Catalan","Madrid","Kenya","Boycott","China","opioids","Fed","Obamacare","Tesla","Twitter")
-ml$important<-as.numeric(ml$words %in% keys) 
-
-```
-
-```{r}
-popular_words<-as.data.frame(read.table("top.txt"))
-colnames(popular_words)<-"common"
-common_words<-popular_words[1:2500,]
-```
-
-```{r}
-ml$common<-as.numeric(tolower(ml$words) %in% common_words)
-ml
-```
-
-
-##14-fold Cross Validation
-```{r}
-shuffle_ml<-ml[sample(nrow(ml)),]
-cv<-function (k,dataset) {
-  for (i in 0:(k-1)) {
-    testing<-dataset[(i*(nrow(dataset)/k)+1):(i*(nrow(dataset)/k)+(nrow(dataset)/k)),]
-    print(testing)
-  }
-}
-
-cv(14,shuffle_ml)
-```
-
-```{r}
-summary(glm(important~length+caps+common,family=binomial(link="logit"),data=ml))
-```
-
-
+I'm planning on storing key words and frequencies for each news source in an SQL database, then using neural nets (likely via TensorFlow)  to attempt to classify keyword patterns into conservative vs. liberal, extreme vs. moderate, etc. 
