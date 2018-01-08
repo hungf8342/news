@@ -1,7 +1,6 @@
 ---
 title: "Classifying News Sources"
 author: "Frances Hung"
-date: "10/21/2017"
 output: pdf_document
 ---
 
@@ -128,7 +127,7 @@ final_table %>% gather(news_src,coverage,-rn) %>%
 
 ##Preliminary Observations
 
-Visually, it is difficult to compare fingerprints correctly between news sources, but nevertheless, there are some patterns which seem to occur. Generally, conservative news sources like Fox and Breitbart heavily cover different (usually less global) topics from liberal news sources. This leads to a more scattered fingerprint. However, there are exceptions (on 1/8/2018, for instance, Breitbart's fingerprint was one of the most dense. The major headlines that morning for most sources were on Trump Tower, the Golden Globes/Oprah Winfrey, and Salvadorans, which were all national and not global news). 
+Visually, it is difficult to compare fingerprints correctly between news sources, but nevertheless, there are some patterns which seem to occur. Generally, conservative news sources like Fox and Breitbart heavily cover different (usually less global) topics from liberal news sources. This leads to a more scattered fingerprint. However, there are exceptions (on 1/8/2018, for instance, Breitbart's morning fingerprint was one of the most dense. The major headlines that morning for most sources were on Trump Tower, the Golden Globes/Oprah Winfrey, and Salvadorans, which were all national and not global news). 
 
 The same goes for far-left sources like Al Jazeera. These news sources tended to cover lesser-known events than mainstream media covered.
 
