@@ -25,6 +25,9 @@ require(tidyr)
 require(ggplot2)
 require(tm)
 require(stringr)
+require(sqldf)
+require(XLConnectJars)
+require(XLConnect)
 ```
 
 
@@ -74,7 +77,13 @@ colnames(headlines.short)<-c("word","freq")
 topic_contain<-function(list,dataset) {
   p<-TRUE
   for (i in length(list)) {
-    new<-grepl(list[i],dataset[,1])
+    if (nchar(as.character(list[i]))>3) {
+    new<-grepl(paste(c(list[i],paste(list[i],"s",sep=""),
+          substr(list[i],1,nchar(as.character(list[i]))-1)),collapse="|"),dataset[,1])
+    }
+    else {
+    new<-grepl(paste(c(list[i],paste(list[i],"s",sep="")),collapse="|"),dataset[,1])
+    }
     p<-(p & new)
   }
   sum(p)/10
@@ -116,13 +125,15 @@ freq.keywords<-function(news) {
 
 final_table<-freq.keywords(list(reuters,bbc,cbs,breitbart,huff_post,fox,times))
 colnames(final_table)<-c("reuters","bbc","cbs","breitbart","huff_post","fox","times")
-final_table<-final_table %>% setDT(keep.rownames=TRUE)
+final_table<-final_table %>% setDT(keep.rownames=TRUE) %>% mutate(date=Sys.time()) %>% as.data.frame()
 
-final_table %>% gather(news_src,coverage,-rn) %>%
+
+final_table %>% gather(news_src,coverage,-c(rn,date)) %>%
   ggplot(aes(x=news_src,y=rn))+geom_point(aes(size=coverage,fill=coverage),shape=21)+
   guides(size=FALSE)+
   ylab("keywords") +
-  ggtitle(paste("Coverage of Topics by Source",Sys.Date()))
+  ggtitle(paste("Coverage of Topics by Source",Sys.time()))
+
 ```
 
 ##Preliminary Observations
@@ -131,6 +142,22 @@ Visually, it is difficult to compare fingerprints correctly between news sources
 
 The same goes for far-left sources like Al Jazeera. These news sources tended to cover lesser-known events than mainstream media covered.
 
+##Storing Observations
+
+I use a SQLite database to store our keywords with a time stamp. An interesting exploration would be to look at fingerprints at different times of the day, so we can run this multiple times in a single day.
+
+```{r}
+rownames(final_table)<-NULL
+write.csv(final_table,"dailyinput.csv",row.names=FALSE)
+```
+
+```{r}
+aggregate<-dbConnect(SQLite(),dbname="agg.sqlite")
+daily<-read.csv("dailyinput.csv")
+dbWriteTable(conn=aggregate,name="Fingerprints",value=daily,row.names=FALSE,append=TRUE)
+dbReadTable(aggregate,"Fingerprints") %>% head()
+```
+
 ##Future Steps
 
-I'm planning on storing key words and frequencies for each news source in an SQL database, then using neural nets (likely via TensorFlow)  to attempt to classify keyword patterns into conservative vs. liberal, extreme vs. moderate, etc. 
+I'm planning on using neural nets (likely via TensorFlow)  to attempt to classify keyword patterns into conservative vs. liberal, extreme vs. moderate, etc. 
