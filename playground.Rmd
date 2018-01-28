@@ -28,6 +28,7 @@ require(stringr)
 require(sqldf)
 require(XLConnectJars)
 require(XLConnect)
+require(wordcloud)
 ```
 
 
@@ -40,6 +41,7 @@ make_dataframe<-function(url) {
 
 #clean headlines by removing punctuation
 remove_stops<-function(headlines) {
+  rownames(headlines)<-c()
   heads=as.vector(headlines) %>% tolower() %>% gsub("'s|[[:punct:]]","",.) %>% gsub("[[:space:]]", " ",.)
   stop_regex=paste(stopwords('en'), collapse='\\b|\\b')
   stop_regex=paste0('\\b', stop_regex, '\\b')
@@ -65,11 +67,13 @@ huff_post<-make_dataframe("https://newsapi.org/v2/top-headlines?sources=the-huff
 
 
 ```{r}
-headlines.short<-unlist(lapply(c(reuters,bbc,google_news,fox,breitbart,huff_post),remove_stops))
+headlines.short<-unlist(lapply(c(reuters,bbc,google_news,fox,breitbart,huff_post),remove_stops)) 
 
 #dataframe of words repeated more than twice across headlines
-headlines.short<-unlist(strsplit(headlines.short," ")) %>% table() %>% .[(.)>2] %>% as.data.frame() %>% .[-1,]
-colnames(headlines.short)<-c("word","freq")
+headlines.words<-unlist(strsplit(headlines.short," ")) %>% table() %>% .[(.)>2] %>% as.data.frame() %>% .[-1,]
+colnames(headlines.words)<-c("word","freq")
+
+#headlines.short<-headlines.short %>% table()
 ```
 
 ##What proportion of headlines in one source contain a certain key word(s)?
@@ -79,10 +83,10 @@ topic_contain<-function(list,dataset) {
   for (i in length(list)) {
     if (nchar(as.character(list[i]))>3) {
     new<-grepl(paste(c(list[i],paste(list[i],"s",sep=""),
-          substr(list[i],1,nchar(as.character(list[i]))-1)),collapse="|"),dataset[,1])
+          substr(list[i],1,nchar(as.character(list[i]))-1)),collapse="|"),dataset)
     }
     else {
-    new<-grepl(paste(c(list[i],paste(list[i],"s",sep="")),collapse="|"),dataset[,1])
+    new<-grepl(paste(c(list[i],paste(list[i],"s",sep="")),collapse="|"),dataset)
     }
     p<-(p & new)
   }
@@ -94,7 +98,9 @@ topic_contain<-function(list,dataset) {
 ##Applying the above function to multiple key words
 ```{r}
 topics<-function(dataset,terms) {
-  as.data.frame(unlist(lapply(terms,topic_contain,dataset))) %>% unlist()
+  data.simp<-dataset[,1] %>% remove_stops
+  
+  as.data.frame(unlist(lapply(terms,topic_contain,data.simp))) %>% unlist()
 }
 ```
 
@@ -108,18 +114,17 @@ I then plotted frequencies of each of these words for each of 7 news sources on 
 ```{r}
 
 #function which takes a news source and returns the frequency of keywords appearing in that source's headlines
-#requires final.keywords$words, a column of keywords
 final_col<-function(news_source) {
   news<-sapply(news_source,tolower)
-  single<-topics(news,headlines.short$word) %>% as.data.frame()
-  rownames(single)<-headlines.short$word %>% as.character()
+  single<-topics(news,headlines.words$word) %>% as.data.frame()
+  rownames(single)<-headlines.words$word %>% as.character()
   return(single)
 }
 
 #function which applies the above function to many news sources and aggregates them as a dataframe
 freq.keywords<-function(news) {
   final_table<-as.data.frame(sapply(news, function(x) final_col(x)))
-  rownames(final_table)<-headlines.short$word
+  rownames(final_table)<-headlines.words$word
   return(final_table)
 }
 
@@ -155,9 +160,26 @@ write.csv(final_table,"dailyinput.csv",row.names=FALSE)
 aggregate<-dbConnect(SQLite(),dbname="agg.sqlite")
 daily<-read.csv("dailyinput.csv")
 dbWriteTable(conn=aggregate,name="Fingerprints",value=daily,row.names=FALSE,append=TRUE)
-dbReadTable(aggregate,"Fingerprints") %>% head()
+values.table<-dbReadTable(aggregate,"Fingerprints") 
+```
+
+Here's an up-to-date word cloud of the words which show up most frequently over different keyword collection days/times.  
+
+```{r}
+viz.table<-values.table %>% select(rn) %>% group_by(rn) %>% summarise(days=n()) %>% arrange(desc(days)) 
+
+wordcloud(viz.table$rn,viz.table$days,min.freq=4)
+
+```
+
+I'm still trying to find the best way to visualize the daily distribution of keywords, but the below graph works well. It's the continuous equivalent of a stacked bar chart, so we can track not only how each individual news source covers topics, but general topic distribution as well.
+
+The below bar chart shows cumulative key word frequencies for 2018-01-11 08:22:26.
+```{r}
+sorted.table<-values.table %>% filter(date!="2018-01-16 20:34:54") 
+sorted.table %>% ungroup() %>% filter(date=="2018-01-11 08:22:26") %>% select(-date) %>% gather(source,freq,-rn) %>% ggplot(aes(x=rn,y=freq,color=source,group=source))+geom_area(aes(color=source),stat="identity")+theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ##Future Steps
 
-I'm planning on using neural nets (likely via TensorFlow)  to attempt to classify keyword patterns into conservative vs. liberal, extreme vs. moderate, etc. 
+Visualizing trends for more than a single collection at a time will be tricky. I'm planning on using neural nets (likely via TensorFlow)  to attempt to classify keyword patterns into conservative vs. liberal, extreme vs. moderate, etc. 
