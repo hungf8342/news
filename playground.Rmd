@@ -29,6 +29,7 @@ require(sqldf)
 require(XLConnectJars)
 require(XLConnect)
 require(wordcloud)
+require(lazyeval)
 ```
 
 
@@ -42,10 +43,12 @@ make_dataframe<-function(url) {
 #clean headlines by removing punctuation
 remove_stops<-function(headlines) {
   rownames(headlines)<-c()
-  heads=as.vector(headlines) %>% tolower() %>% gsub("'s|[[:punct:]]","",.) %>% gsub("[[:space:]]", " ",.)
+  heads=as.vector(headlines) %>% tolower() %>% 
+    gsub("\\.", "",.) %>% gsub("('s|[^[:alnum:][:space:]])", " ",.) %>% 
+    gsub("^ *|(?<= ) | *$", "",.,perl=TRUE) %>% gsub("\\b\\w{1,2}\\b ", " ",.)
   stop_regex=paste(stopwords('en'), collapse='\\b|\\b')
   stop_regex=paste0('\\b', stop_regex, '\\b')
-  heads = stringr::str_replace_all(heads, stop_regex, '')
+  heads = stringr::str_replace_all(heads, stop_regex, '')  %>% str_trim(.) %>% str_squish(.)
   return(heads)
 }
 ```
@@ -68,6 +71,7 @@ huff_post<-make_dataframe("https://newsapi.org/v2/top-headlines?sources=the-huff
 
 ```{r}
 headlines.short<-unlist(lapply(c(reuters,bbc,google_news,fox,breitbart,huff_post),remove_stops)) 
+write(headlines.short,"corpus.txt",append="True")
 
 #dataframe of words repeated more than twice across headlines
 headlines.words<-unlist(strsplit(headlines.short," ")) %>% table() %>% .[(.)>2] %>% as.data.frame() %>% .[-1,]
@@ -161,25 +165,123 @@ aggregate<-dbConnect(SQLite(),dbname="agg.sqlite")
 daily<-read.csv("dailyinput.csv")
 dbWriteTable(conn=aggregate,name="Fingerprints",value=daily,row.names=FALSE,append=TRUE)
 values.table<-dbReadTable(aggregate,"Fingerprints") 
+dbDisconnect(aggregate)
 ```
 
 Here's an up-to-date word cloud of the words which show up most frequently over different keyword collection days/times.  
 
-```{r}
+```{r, echo=FALSE}
 viz.table<-values.table %>% select(rn) %>% group_by(rn) %>% summarise(days=n()) %>% arrange(desc(days)) 
 
-wordcloud(viz.table$rn,viz.table$days,min.freq=4)
+viz<-function (news) {
+  table<-values.table %>% filter_(interp(~new!=0,new=as.name(news))) %>% select(rn) %>% group_by(rn) %>% summarise(days=n()) %>% arrange(desc(days)) %>% filter(! (rn %in% c("trump","says","us")))
+  wordcloud(table$rn,table$days,scale=c(3,.5),min.freq=4)
+}
 
+wordcloud(viz.table$rn,viz.table$days,min.freq=5)
+#par(mfrow=c(2,3))
+viz("huff_post")
+viz("breitbart")
+viz("reuters")
 ```
+
 
 I'm still trying to find the best way to visualize the daily distribution of keywords, but the below graph works well. It's the continuous equivalent of a stacked bar chart, so we can track not only how each individual news source covers topics, but general topic distribution as well.
 
 The below bar chart shows cumulative key word frequencies for 2018-01-11 08:22:26.
+
 ```{r}
-sorted.table<-values.table %>% filter(date!="2018-01-16 20:34:54") 
-sorted.table %>% ungroup() %>% filter(date=="2018-01-11 08:22:26") %>% select(-date) %>% gather(source,freq,-rn) %>% ggplot(aes(x=rn,y=freq,color=source,group=source))+geom_area(aes(color=source),stat="identity")+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+values.table %>% ungroup() %>% filter(date=="2018-01-11 08:22:26") %>% select(-date) %>% gather(source,freq,-rn) %>% ggplot(aes(x=rn,y=freq,color=source,group=source))+geom_area(aes(color=source),stat="identity")+theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ##Future Steps
 
-Visualizing trends for more than a single collection at a time will be tricky. I'm planning on using neural nets (likely via TensorFlow)  to attempt to classify keyword patterns into conservative vs. liberal, extreme vs. moderate, etc. 
+Visualizing trends for more than a single collection at a time will be tricky. I use neural nets via TensorFlow to attempt to classify keyword patterns into conservative vs. liberal, extreme vs. moderate, etc. We first convert, using Word2Vec, the words to a format suitable for neural nets. Our corpus consists of scraped headlines from the online news sites we investigate; as we add to our corpus, we assume our neural nets will improve. Our first attempt will involve classifying different news sources.
+```{r}
+require(wordVectors)
+model <- train_word2vec("corpus.txt",vectors=200,iter=10,force=TRUE)
+model %>% closest_to("nafta")
+#print(as.vector(model[["john"]]))
+```
+The output of our neural net will be the one-hot-encoded news organization authoring the news fingerprint input. The input would be consist of the top 10 words and their frequencies of that news source for a chosen collection time. The words will be in word2vec form and their frequencies added as an additional entry in the vector.
+```{r}
+library(keras)
+top_5 <- function(source,time) {
+  five_words <- values.table %>% filter(date==time) %>% select(rn,source) %>% arrange_(source) %>% tail(10)
+  five_words
+}
+vector_input<-function(source,time) {
+  dist<-top_5(source,time)[[source]] #%>% select_(source) %>% unlist()
+  words<-top_5(source,time)$rn %>% lapply(function(x) as.vector(model[[x]])) %>% unlist() %>% replace(is.na(.),0) %>% append(dist)
+  words
+}
+```
+A simple feed-forward neural net is used.
+```{r}
+network_model<-keras_model_sequential()
+network_model %>%
+  layer_dense(units=300,activation='relu',input_shape = c(2010)) %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = 128, activation = 'relu') %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = 6, activation = 'softmax')
+```
+We make a function for making the train/test data; the data features for each instance consists of the 2000-vector of the top 10 words in vector form, followed by the frequencies of the words, for a total of a 2010-length vector. The predictions for each instance is the one-hot-encoded new source vector corresponding to the feature vector.
+```{r}
+require(onehot)
+make_train<-function(perc) {
+  master<-data.frame(matrix(ncol = 2011, nrow = 6*length(unique(values.table$date))))
+  raw_training<-values.table %>% filter(date %in% sample(unique(date),perc*length(unique(date))))
+  i=1
+  for (day in raw_training$date) {
+    for (source in c("bbc","reuters","fox","breitbart","times","cbs")) {
+      temp<-vector_input(source,toString(day)) %>% append(source)
+      if (length(temp)==2011) {
+        master[i,]<-temp
+        i=i+1
+      }
+    }
+  }
+  replace<-onehot(as.data.frame(master$X2011),stringsAsFactors = TRUE)
+  master$X2011<-predict(replace,as.data.frame(master$X2011))
+  master
+}
+```
+
+```{r}
+training<-make_train(1)
+```
+After making our training data, we compile the neural net and fit it using the training data.
+```{r}
+smp_size <- floor(0.75 * nrow(training))
+set.seed(123)
+train_ind <- sample(seq_len(nrow(training)), size = smp_size)
+train<-training[train_ind,]
+test<-training[-train_ind,]
+y_train<-train$X2011 %>% as.matrix()
+x_train<-train %>% select(-X2011) %>% as.matrix()
+y_test<-test$X2011 %>% as.matrix()
+x_test<-test %>% select(-X2011) %>% as.matrix()
+```
+```{r}
+network_model %>% compile(
+  loss = 'categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+history <- network_model %>% fit(
+  x_train, y_train, 
+  epochs = 30, batch_size = 348, 
+  validation_split = 0.2
+)
+```
+```{r}
+plot(history)
+```
+We make test data:
+Evaluated on test data the same size as the training data, the neural net does better than by pure chance. Currently, accuracy is about 95%, and we have about 20% of the news headline words vectorized. This implies that different news networks have unique, differentiable topic coverage from a ML viewpoint.
+```{r}
+network_model %>% evaluate(x_test,y_test)
+length(unique(values.table$rn))
+```
+
